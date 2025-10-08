@@ -14,8 +14,13 @@ from sqlalchemy.orm import sessionmaker
 # Настройка базы данных
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
-# Создаем движок базы данных (только SQLite для совместимости)
-engine = create_engine("sqlite:///./test.db", connect_args={"check_same_thread": False})
+# Создаем движок базы данных
+if DATABASE_URL.startswith("postgresql://"):
+    # Для PostgreSQL
+    engine = create_engine(DATABASE_URL)
+else:
+    # Для SQLite (fallback)
+    engine = create_engine("sqlite:///./test.db", connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -188,7 +193,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.9.0", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "2.0.0", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -196,7 +201,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.9.0"
+        "version": "2.0.0"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -222,43 +227,85 @@ async def get_stats():
     }
 
 @app.post("/api/tasks/{task_id}/submit")
-async def submit_task(task_id: int, submission: TaskSubmission):
-    """Отправить решение задачи"""
+async def submit_task(
+    task_id: int, 
+    submission: TaskSubmission,
+    current_user: str = Depends(verify_token),
+    db = Depends(get_db)
+):
+    """Отправить решение задачи (требует авторизации)"""
+    # Получаем пользователя из базы данных
+    user = db.query(User).filter(User.username == current_user).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Проверяем, существует ли задача
     task = next((t for t in MOCK_TASKS if t["id"] == task_id), None)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
+    # Создаем новую отправку
+    new_submission = TaskSubmission(
+        user_id=user.id,
+        task_id=task_id,
+        solution=submission.solution,
+        notes=submission.notes
+    )
+    
+    db.add(new_submission)
+    db.commit()
+    db.refresh(new_submission)
+    
     return {
         "message": "Решение принято!",
         "task_id": task_id,
+        "submission_id": new_submission.id,
         "points_earned": task["points"],
         "status": "success",
-        "submission_time": datetime.utcnow()
+        "submitted_by": current_user,
+        "submission_time": new_submission.submitted_at
     }
 
 @app.post("/api/auth/register")
-async def register(user_data: UserRegister):
+async def register(user_data: UserRegister, db = Depends(get_db)):
     """Регистрация нового пользователя"""
-    if user_data.username in MOCK_USERS:
+    # Проверяем, существует ли пользователь
+    existing_user = db.query(User).filter(User.username == user_data.username).first()
+    if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    # В реальном приложении здесь бы сохраняли в базу данных
-    MOCK_USERS[user_data.username] = user_data.password
+    existing_email = db.query(User).filter(User.email == user_data.email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
+    # Создаем нового пользователя
+    new_user = User(
+        username=user_data.username,
+        email=user_data.email,
+        hashed_password=user_data.password  # В реальном приложении нужно хешировать
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
     
     return {
         "message": "User registered successfully",
         "username": user_data.username,
-        "email": user_data.email
+        "email": user_data.email,
+        "user_id": new_user.id
     }
 
 @app.post("/api/auth/login", response_model=Token)
-async def login(user_credentials: UserLogin):
+async def login(user_credentials: UserLogin, db = Depends(get_db)):
     """Вход пользователя"""
-    if user_credentials.username not in MOCK_USERS:
+    # Ищем пользователя в базе данных
+    user = db.query(User).filter(User.username == user_credentials.username).first()
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid username")
     
     # Проверяем пароль (упрощенно для тестирования)
-    if user_credentials.password != MOCK_USERS[user_credentials.username]:
+    if user_credentials.password != user.hashed_password:
         raise HTTPException(status_code=401, detail="Invalid password")
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -300,9 +347,9 @@ async def test_database():
         
         return {
             "status": "Database connected successfully",
-            "database_type": "SQLite",
+            "database_type": "PostgreSQL" if DATABASE_URL.startswith("postgresql://") else "SQLite",
             "test_result": result[0] if result else None,
-            "message": "SQLite database working - PostgreSQL drivers incompatible with Python 3.13"
+            "message": "Database working with Python 3.11 on Render"
         }
     except Exception as e:
         return {
