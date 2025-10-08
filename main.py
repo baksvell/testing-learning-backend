@@ -1,15 +1,17 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List, Optional
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
 
 # Создание FastAPI приложения
 app = FastAPI(
     title="Testing Learning Platform API",
     description="API для платформы обучения тестированию",
-    version="1.0.6"
+    version="1.0.7"
 )
 
 # CORS настройки
@@ -39,6 +41,48 @@ class StatsResponse(BaseModel):
 class TaskSubmission(BaseModel):
     solution: str
     notes: Optional[str] = None
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+# JWT настройки
+SECRET_KEY = "your-secret-key-here-change-in-production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+security = HTTPBearer()
+
+# Простые тестовые пользователи
+MOCK_USERS = {
+    "testuser": "testpass123",
+    "admin": "admin123"
+}
+
+# JWT функции
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return username
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 # Простые тестовые данные
 MOCK_TASKS = [
@@ -73,7 +117,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.0.6", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.0.7", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -81,7 +125,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.0.6"
+        "version": "1.0.7"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -121,14 +165,40 @@ async def submit_task(task_id: int, submission: TaskSubmission):
         "submission_time": datetime.utcnow()
     }
 
+@app.post("/api/auth/login", response_model=Token)
+async def login(user_credentials: UserLogin):
+    """Вход пользователя"""
+    if user_credentials.username not in MOCK_USERS:
+        raise HTTPException(status_code=401, detail="Invalid username")
+    
+    if MOCK_USERS[user_credentials.username] != user_credentials.password:
+        raise HTTPException(status_code=401, detail="Invalid password")
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user_credentials.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
 @app.get("/api/user/activity")
-async def get_user_activity():
-    """Получить активность пользователя"""
+async def get_user_activity(current_user: str = Depends(verify_token)):
+    """Получить активность пользователя (требует авторизации)"""
     return {
+        "username": current_user,
         "recent_tasks": [1, 2],
         "completed_today": 3,
         "streak": 5,
         "last_activity": datetime.utcnow()
+    }
+
+@app.get("/api/user/profile")
+async def get_user_profile(current_user: str = Depends(verify_token)):
+    """Получить профиль пользователя (требует авторизации)"""
+    return {
+        "username": current_user,
+        "join_date": "2025-01-01",
+        "total_points": 150,
+        "level": "Beginner"
     }
 
 # Для Render
