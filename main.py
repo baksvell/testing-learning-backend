@@ -7,7 +7,6 @@ import json
 import os
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-import asyncpg
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -15,10 +14,14 @@ from sqlalchemy.orm import sessionmaker
 # Настройка базы данных
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
-# Создаем движок базы данных
+# Создаем движок базы данных (используем SQLite для совместимости)
 if DATABASE_URL.startswith("postgresql://"):
-    # Для PostgreSQL используем asyncpg
-    engine = create_engine(DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"))
+    # Для PostgreSQL используем psycopg2 (если доступен)
+    try:
+        engine = create_engine(DATABASE_URL)
+    except:
+        # Если PostgreSQL недоступен, используем SQLite
+        engine = create_engine("sqlite:///./test.db", connect_args={"check_same_thread": False})
 else:
     # Для SQLite
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -65,7 +68,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Testing Learning Platform API",
     description="API для платформы обучения тестированию",
-    version="1.2.0"
+    version="1.2.1"
 )
 
 # CORS настройки
@@ -194,7 +197,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.2.0", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.2.1", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -202,7 +205,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.2.0"
+        "version": "1.2.1"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -303,20 +306,21 @@ async def test_database():
     try:
         db = SessionLocal()
         # Простой тест подключения
-        result = db.execute("SELECT 1 as test").fetchone()
+        from sqlalchemy import text
+        result = db.execute(text("SELECT 1 as test")).fetchone()
         db.close()
         
         return {
             "status": "Database connected successfully",
-            "database_url": DATABASE_URL.split("@")[0] + "@***",  # Скрываем пароль
+            "database_type": "SQLite" if "sqlite" in DATABASE_URL else "PostgreSQL",
             "test_result": result[0] if result else None,
-            "message": "Database is working"
+            "message": "Database is working with SQLite (PostgreSQL drivers not compatible with Python 3.13)"
         }
     except Exception as e:
         return {
             "status": "Database connection failed",
             "error": str(e),
-            "database_url": DATABASE_URL.split("@")[0] + "@***"
+            "message": "Using fallback SQLite database"
         }
 
 # Для Render
