@@ -4,14 +4,68 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List, Optional
 import json
+import os
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+import asyncpg
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+# Настройка базы данных
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+
+# Создаем движок базы данных
+if DATABASE_URL.startswith("postgresql://"):
+    # Для PostgreSQL используем asyncpg
+    engine = create_engine(DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"))
+else:
+    # Для SQLite
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Модели базы данных
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Task(Base):
+    __tablename__ = "tasks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    description = Column(Text)
+    category = Column(String)
+    difficulty = Column(String)
+    points = Column(Integer)
+    test_cases = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class TaskSubmission(Base):
+    __tablename__ = "task_submissions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    task_id = Column(Integer, index=True)
+    solution = Column(Text)
+    notes = Column(Text)
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+
+# Создание таблиц
+Base.metadata.create_all(bind=engine)
 
 # Создание FastAPI приложения
 app = FastAPI(
     title="Testing Learning Platform API",
     description="API для платформы обучения тестированию",
-    version="1.1.2"
+    version="1.2.0"
 )
 
 # CORS настройки
@@ -61,6 +115,14 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 security = HTTPBearer()
+
+# Функции для работы с базой данных
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Простые тестовые пользователи (с простыми паролями для тестирования)
 MOCK_USERS = {
@@ -132,7 +194,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.1.2", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.2.0", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -140,7 +202,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.1.2"
+        "version": "1.2.0"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -237,12 +299,25 @@ async def get_user_profile(current_user: str = Depends(verify_token)):
 
 @app.get("/api/database/test")
 async def test_database():
-    """Тест подключения к PostgreSQL (без реальной БД)"""
-    return {
-        "status": "psycopg2 not available on Render",
-        "message": "Use alternative database solutions like SQLite or external PostgreSQL",
-        "recommendation": "For production, use external PostgreSQL service"
-    }
+    """Тест подключения к базе данных"""
+    try:
+        db = SessionLocal()
+        # Простой тест подключения
+        result = db.execute("SELECT 1 as test").fetchone()
+        db.close()
+        
+        return {
+            "status": "Database connected successfully",
+            "database_url": DATABASE_URL.split("@")[0] + "@***",  # Скрываем пароль
+            "test_result": result[0] if result else None,
+            "message": "Database is working"
+        }
+    except Exception as e:
+        return {
+            "status": "Database connection failed",
+            "error": str(e),
+            "database_url": DATABASE_URL.split("@")[0] + "@***"
+        }
 
 # Для Render
 if __name__ == "__main__":
