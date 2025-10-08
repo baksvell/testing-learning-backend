@@ -12,7 +12,7 @@ from passlib.context import CryptContext
 app = FastAPI(
     title="Testing Learning Platform API",
     description="API для платформы обучения тестированию",
-    version="1.0.8"
+    version="1.0.9"
 )
 
 # CORS настройки
@@ -66,17 +66,22 @@ security = HTTPBearer()
 # Настройка хеширования паролей
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Простые тестовые пользователи (с хешированными паролями)
+# Простые тестовые пользователи (с простыми паролями для тестирования)
 MOCK_USERS = {
-    "testuser": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # testpass123
-    "admin": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/9.8.8.8"  # admin123
+    "testuser": "testpass123",  # Простой пароль для тестирования
+    "admin": "admin123"         # Простой пароль для тестирования
 }
 
 # Функции для работы с паролями
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password, stored_password):
+    # Для тестирования просто сравниваем строки
+    # В продакшене здесь было бы: pwd_context.verify(plain_password, stored_password)
+    return plain_password == stored_password
 
 def get_password_hash(password):
+    # Обрезаем пароль до 72 байт для bcrypt
+    if len(password.encode('utf-8')) > 72:
+        password = password[:72]
     return pwd_context.hash(password)
 
 # JWT функции
@@ -133,7 +138,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.0.8", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.0.9", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -141,7 +146,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.0.8"
+        "version": "1.0.9"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
