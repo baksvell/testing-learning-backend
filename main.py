@@ -6,12 +6,14 @@ from typing import List, Optional
 import json
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 # Создание FastAPI приложения
 app = FastAPI(
     title="Testing Learning Platform API",
     description="API для платформы обучения тестированию",
-    version="1.1.0"
+    version="1.1.1"
 )
 
 # CORS настройки
@@ -132,7 +134,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.1.0", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.1.1", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -140,7 +142,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.1.0"
+        "version": "1.1.1"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -234,6 +236,23 @@ async def get_user_profile(current_user: str = Depends(verify_token)):
         "total_points": 150,
         "level": "Beginner"
     }
+
+@app.get("/api/database/test")
+async def test_database():
+    """Тест подключения к PostgreSQL (без реальной БД)"""
+    try:
+        # Просто импортируем psycopg2 - это покажет, что библиотека работает
+        connection_info = {
+            "psycopg2_version": psycopg2.__version__,
+            "status": "psycopg2 imported successfully",
+            "message": "PostgreSQL driver is ready"
+        }
+        return connection_info
+    except Exception as e:
+        return {
+            "error": str(e),
+            "status": "psycopg2 import failed"
+        }
 
 # Для Render
 if __name__ == "__main__":
