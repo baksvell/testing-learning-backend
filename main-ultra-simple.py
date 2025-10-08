@@ -1,16 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, Float
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
 from pydantic import BaseModel
 from datetime import datetime
-import os
 import json
 from typing import List, Optional
-
-# Конфигурация
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test_website.db")
 
 # Создание FastAPI приложения
 app = FastAPI(
@@ -34,49 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# База данных
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# Модели базы данных
-class User(Base):
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(80), unique=True, index=True, nullable=False)
-    email = Column(String(120), unique=True, index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    is_active = Column(Boolean, default=True)
-    level = Column(Integer, default=1)
-    experience = Column(Integer, default=0)
-
-class Task(Base):
-    __tablename__ = "tasks"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(200), nullable=False)
-    description = Column(Text, nullable=False)
-    category = Column(String(50), nullable=False)
-    difficulty = Column(String(20), nullable=False)
-    points = Column(Integer, default=10)
-    test_cases = Column(Text)  # JSON строка
-    created_at = Column(DateTime, default=datetime.utcnow)
-    is_active = Column(Boolean, default=True)
-
 # Pydantic модели
-class UserCreate(BaseModel):
-    username: str
-    email: str
-
-class UserResponse(BaseModel):
-    id: int
-    username: str
-    email: str
-    level: int
-    experience: int
-    created_at: datetime
-
 class TaskResponse(BaseModel):
     id: int
     title: str
@@ -90,17 +41,6 @@ class StatsResponse(BaseModel):
     total_users: int
     total_tasks: int
     completed_tasks: int
-
-# Создание таблиц
-Base.metadata.create_all(bind=engine)
-
-# Зависимости
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # Заглушки для тестовых данных
 MOCK_TASKS = [
@@ -128,6 +68,19 @@ MOCK_TASKS = [
             "Проверить статус коды",
             "Проверить структуру JSON",
             "Проверить обработку ошибок"
+        ])
+    },
+    {
+        "id": 3,
+        "title": "Тестирование безопасности",
+        "description": "Проверьте защиту от SQL-инъекций и XSS атак",
+        "category": "Security Testing",
+        "difficulty": "Advanced",
+        "points": 30,
+        "test_cases": json.dumps([
+            "Проверить защиту от SQL-инъекций",
+            "Проверить защиту от XSS",
+            "Проверить валидацию входных данных"
         ])
     }
 ]
@@ -179,7 +132,15 @@ async def submit_task(task_id: int, submission: dict):
         "status": "success"
     }
 
+@app.get("/api/user/activity")
+async def get_user_activity():
+    """Получить активность пользователя"""
+    return {
+        "recent_tasks": [1, 2],
+        "completed_today": 3,
+        "streak": 5
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

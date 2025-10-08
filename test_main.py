@@ -270,3 +270,4 @@ def test_get_products_with_search():
 # Запуск тестов
 if __name__ == "__main__":
     pytest.main([__file__])
+
