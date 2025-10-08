@@ -98,7 +98,7 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow()}
+    return {"status": "healthy", "timestamp": datetime.utcnow(), "version": "1.0.2"}
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
 async def get_tasks():
