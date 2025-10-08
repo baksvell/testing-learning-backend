@@ -7,62 +7,11 @@ import json
 import os
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+# SQLAlchemy убран из-за несовместимости с Python 3.13
 
-# Настройка базы данных
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+# База данных временно отключена из-за несовместимости с Python 3.13
 
-# Создаем движок базы данных (используем SQLite для совместимости)
-if DATABASE_URL.startswith("postgresql://"):
-    # Для PostgreSQL используем psycopg2 (если доступен)
-    try:
-        engine = create_engine(DATABASE_URL)
-    except:
-        # Если PostgreSQL недоступен, используем SQLite
-        engine = create_engine("sqlite:///./test.db", connect_args={"check_same_thread": False})
-else:
-    # Для SQLite
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# Модели базы данных
-class User(Base):
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-class Task(Base):
-    __tablename__ = "tasks"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True)
-    description = Column(Text)
-    category = Column(String)
-    difficulty = Column(String)
-    points = Column(Integer)
-    test_cases = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-class TaskSubmission(Base):
-    __tablename__ = "task_submissions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True)
-    task_id = Column(Integer, index=True)
-    solution = Column(Text)
-    notes = Column(Text)
-    submitted_at = Column(DateTime, default=datetime.utcnow)
-
-# Создание таблиц
-Base.metadata.create_all(bind=engine)
+# Модели базы данных временно отключены
 
 # Создание FastAPI приложения
 app = FastAPI(
@@ -119,13 +68,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 security = HTTPBearer()
 
-# Функции для работы с базой данных
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Функции для работы с базой данных временно отключены
 
 # Простые тестовые пользователи (с простыми паролями для тестирования)
 MOCK_USERS = {
@@ -197,7 +140,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.2.1", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.3.0", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -205,7 +148,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.2.1"
+        "version": "1.3.0"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -251,11 +194,8 @@ async def register(user_data: UserRegister):
     if user_data.username in MOCK_USERS:
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    # Хешируем пароль
-    hashed_password = get_password_hash(user_data.password)
-    
     # В реальном приложении здесь бы сохраняли в базу данных
-    MOCK_USERS[user_data.username] = hashed_password
+    MOCK_USERS[user_data.username] = user_data.password
     
     return {
         "message": "User registered successfully",
@@ -269,8 +209,8 @@ async def login(user_credentials: UserLogin):
     if user_credentials.username not in MOCK_USERS:
         raise HTTPException(status_code=401, detail="Invalid username")
     
-    # Проверяем пароль с хешированием
-    if not verify_password(user_credentials.password, MOCK_USERS[user_credentials.username]):
+    # Проверяем пароль (упрощенно для тестирования)
+    if user_credentials.password != MOCK_USERS[user_credentials.username]:
         raise HTTPException(status_code=401, detail="Invalid password")
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -303,25 +243,12 @@ async def get_user_profile(current_user: str = Depends(verify_token)):
 @app.get("/api/database/test")
 async def test_database():
     """Тест подключения к базе данных"""
-    try:
-        db = SessionLocal()
-        # Простой тест подключения
-        from sqlalchemy import text
-        result = db.execute(text("SELECT 1 as test")).fetchone()
-        db.close()
-        
-        return {
-            "status": "Database connected successfully",
-            "database_type": "SQLite" if "sqlite" in DATABASE_URL else "PostgreSQL",
-            "test_result": result[0] if result else None,
-            "message": "Database is working with SQLite (PostgreSQL drivers not compatible with Python 3.13)"
-        }
-    except Exception as e:
-        return {
-            "status": "Database connection failed",
-            "error": str(e),
-            "message": "Using fallback SQLite database"
-        }
+    return {
+        "status": "info",
+        "message": "База данных временно отключена из-за несовместимости с Python 3.13",
+        "database_type": "Отключена",
+        "note": "SQLAlchemy несовместим с Python 3.13 на Render"
+    }
 
 # Для Render
 if __name__ == "__main__":
