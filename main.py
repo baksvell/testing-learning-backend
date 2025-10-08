@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -166,7 +166,7 @@ class Product(Base):
 # Pydantic модели
 class UserBase(BaseModel):
     username: str
-    email: EmailStr
+    email: str
 
 class UserCreate(UserBase):
     password: str
@@ -246,7 +246,7 @@ class UserAchievementResponse(BaseModel):
 
 class ContactMessageCreate(BaseModel):
     name: str
-    email: EmailStr
+    email: str
     subject: str
     message: str
 
