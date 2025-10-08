@@ -7,11 +7,58 @@ import json
 import os
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-# SQLAlchemy убран из-за несовместимости с Python 3.13
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-# База данных временно отключена из-за несовместимости с Python 3.13
+# Настройка базы данных
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
-# Модели базы данных временно отключены
+# Создаем движок базы данных
+if DATABASE_URL.startswith("postgresql://"):
+    # Для PostgreSQL
+    engine = create_engine(DATABASE_URL)
+else:
+    # Для SQLite
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Модели базы данных
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Task(Base):
+    __tablename__ = "tasks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    description = Column(Text)
+    category = Column(String)
+    difficulty = Column(String)
+    points = Column(Integer)
+    test_cases = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class TaskSubmission(Base):
+    __tablename__ = "task_submissions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    task_id = Column(Integer, index=True)
+    solution = Column(Text)
+    notes = Column(Text)
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+
+# Создание таблиц
+Base.metadata.create_all(bind=engine)
 
 # Создание FastAPI приложения
 app = FastAPI(
@@ -68,7 +115,13 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 security = HTTPBearer()
 
-# Функции для работы с базой данных временно отключены
+# Зависимость для получения сессии базы данных
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Простые тестовые пользователи (с простыми паролями для тестирования)
 MOCK_USERS = {
@@ -140,7 +193,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.3.0", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.4.0", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -148,7 +201,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.3.0"
+        "version": "1.4.0"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -243,12 +296,25 @@ async def get_user_profile(current_user: str = Depends(verify_token)):
 @app.get("/api/database/test")
 async def test_database():
     """Тест подключения к базе данных"""
-    return {
-        "status": "info",
-        "message": "База данных временно отключена из-за несовместимости с Python 3.13",
-        "database_type": "Отключена",
-        "note": "SQLAlchemy несовместим с Python 3.13 на Render"
-    }
+    try:
+        db = SessionLocal()
+        # Простой тест подключения
+        from sqlalchemy import text
+        result = db.execute(text("SELECT 1 as test")).fetchone()
+        db.close()
+        
+        return {
+            "status": "Database connected successfully",
+            "database_type": "PostgreSQL" if DATABASE_URL.startswith("postgresql://") else "SQLite",
+            "test_result": result[0] if result else None,
+            "message": "Database is working with Python 3.11"
+        }
+    except Exception as e:
+        return {
+            "status": "Database connection failed",
+            "error": str(e),
+            "message": "Check database configuration"
+        }
 
 # Для Render
 if __name__ == "__main__":
