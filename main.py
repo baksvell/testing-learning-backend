@@ -193,7 +193,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.4.0", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.5.0", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -201,7 +201,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.4.0"
+        "version": "1.5.0"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -299,8 +299,7 @@ async def test_database():
     try:
         db = SessionLocal()
         # Простой тест подключения
-        from sqlalchemy import text
-        result = db.execute(text("SELECT 1 as test")).fetchone()
+        result = db.execute("SELECT 1 as test").fetchone()
         db.close()
         
         return {
