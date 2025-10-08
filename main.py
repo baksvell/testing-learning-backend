@@ -138,7 +138,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.6.0", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.6.1", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -146,7 +146,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.6.0"
+        "version": "1.6.1"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
