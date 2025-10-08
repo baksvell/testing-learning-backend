@@ -94,7 +94,7 @@ MOCK_STATS = {
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.0.0"}
+    return {"message": "Testing Learning Platform API", "version": "1.0.1"}
 
 @app.get("/health")
 async def health_check():
