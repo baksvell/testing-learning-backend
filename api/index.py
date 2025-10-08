@@ -9,19 +9,15 @@ from typing import List, Optional
 app = FastAPI(
     title="Testing Learning Platform API",
     description="API для платформы обучения тестированию веб-приложений",
-    version="1.0.0",
+    version="1.0.3",
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# CORS настройки
+# CORS настройки для Back4App
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://testing-learning-frontend.vercel.app",
-        "https://*.vercel.app"
-    ],
+    allow_origins=["*"],  # Back4App требует *
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -94,11 +90,11 @@ MOCK_STATS = {
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.0.2"}
+    return {"message": "Testing Learning Platform API", "version": "1.0.3"}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow(), "version": "1.0.2"}
+    return {"status": "healthy", "timestamp": datetime.utcnow(), "version": "1.0.3"}
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
 async def get_tasks():
