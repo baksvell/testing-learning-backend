@@ -16,8 +16,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
 # Создаем движок базы данных
 if DATABASE_URL.startswith("postgresql://"):
-    # Для PostgreSQL
-    engine = create_engine(DATABASE_URL)
+    # Для PostgreSQL используем asyncpg
+    engine = create_engine(DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"))
 else:
     # Для SQLite
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -193,7 +193,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.7.0", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.8.0", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -201,7 +201,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.7.0"
+        "version": "1.8.0"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -299,7 +299,8 @@ async def test_database():
     try:
         db = SessionLocal()
         # Простой тест подключения
-        result = db.execute("SELECT 1 as test").fetchone()
+        from sqlalchemy import text
+        result = db.execute(text("SELECT 1 as test")).fetchone()
         db.close()
         
         return {

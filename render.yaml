@@ -2,19 +2,14 @@ services:
   - type: web
     name: testing-learning-backend
     env: python
-    plan: free
-    buildCommand: pip install -r requirements-ultra-minimal.txt
-    startCommand: uvicorn main-ultra-simple:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: JWT_SECRET_KEY
+        value: your-super-secret-jwt-key-change-in-production-12345
       - key: DATABASE_URL
         fromDatabase:
           name: testing-learning-db
           property: connectionString
-      - key: JWT_SECRET_KEY
-        generateValue: true
-      - key: PORT
-        value: 10000
-
-databases:
-  - name: testing-learning-db
-    plan: free
