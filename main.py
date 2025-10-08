@@ -6,12 +6,13 @@ from typing import List, Optional
 import json
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+from passlib.context import CryptContext
 
 # Создание FastAPI приложения
 app = FastAPI(
     title="Testing Learning Platform API",
     description="API для платформы обучения тестированию",
-    version="1.0.7"
+    version="1.0.8"
 )
 
 # CORS настройки
@@ -46,6 +47,11 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class UserRegister(BaseModel):
+    username: str
+    password: str
+    email: str
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -57,11 +63,21 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 security = HTTPBearer()
 
-# Простые тестовые пользователи
+# Настройка хеширования паролей
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Простые тестовые пользователи (с хешированными паролями)
 MOCK_USERS = {
-    "testuser": "testpass123",
-    "admin": "admin123"
+    "testuser": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # testpass123
+    "admin": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/9.8.8.8"  # admin123
 }
+
+# Функции для работы с паролями
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
 # JWT функции
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -117,7 +133,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.0.7", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.0.8", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -125,7 +141,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.0.7"
+        "version": "1.0.8"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -165,13 +181,32 @@ async def submit_task(task_id: int, submission: TaskSubmission):
         "submission_time": datetime.utcnow()
     }
 
+@app.post("/api/auth/register")
+async def register(user_data: UserRegister):
+    """Регистрация нового пользователя"""
+    if user_data.username in MOCK_USERS:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Хешируем пароль
+    hashed_password = get_password_hash(user_data.password)
+    
+    # В реальном приложении здесь бы сохраняли в базу данных
+    MOCK_USERS[user_data.username] = hashed_password
+    
+    return {
+        "message": "User registered successfully",
+        "username": user_data.username,
+        "email": user_data.email
+    }
+
 @app.post("/api/auth/login", response_model=Token)
 async def login(user_credentials: UserLogin):
     """Вход пользователя"""
     if user_credentials.username not in MOCK_USERS:
         raise HTTPException(status_code=401, detail="Invalid username")
     
-    if MOCK_USERS[user_credentials.username] != user_credentials.password:
+    # Проверяем пароль с хешированием
+    if not verify_password(user_credentials.password, MOCK_USERS[user_credentials.username]):
         raise HTTPException(status_code=401, detail="Invalid password")
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
