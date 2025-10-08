@@ -14,13 +14,8 @@ from sqlalchemy.orm import sessionmaker
 # Настройка базы данных
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
-# Создаем движок базы данных
-if DATABASE_URL.startswith("postgresql://"):
-    # Для PostgreSQL используем asyncpg
-    engine = create_engine(DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"))
-else:
-    # Для SQLite
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Создаем движок базы данных (только SQLite для совместимости)
+engine = create_engine("sqlite:///./test.db", connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -193,7 +188,7 @@ MOCK_TASKS = [
 # API маршруты
 @app.get("/")
 async def root():
-    return {"message": "Testing Learning Platform API", "version": "1.8.0", "status": "working"}
+    return {"message": "Testing Learning Platform API", "version": "1.9.0", "status": "working"}
 
 @app.get("/health")
 async def health_check():
@@ -201,7 +196,7 @@ async def health_check():
         "status": "healthy", 
         "message": "API is working",
         "timestamp": datetime.utcnow(),
-        "version": "1.8.0"
+        "version": "1.9.0"
     }
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
@@ -305,9 +300,9 @@ async def test_database():
         
         return {
             "status": "Database connected successfully",
-            "database_type": "PostgreSQL" if DATABASE_URL.startswith("postgresql://") else "SQLite",
+            "database_type": "SQLite",
             "test_result": result[0] if result else None,
-            "message": "Database is working with Python 3.11 on new Render service"
+            "message": "SQLite database working - PostgreSQL drivers incompatible with Python 3.13"
         }
     except Exception as e:
         return {
