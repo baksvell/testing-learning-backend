@@ -24,3 +24,4 @@ ENV PORT=8080
 
 # Run the application
 CMD ["python", "-m", "uvicorn", "api.index:app", "--host", "0.0.0.0", "--port", "8080"]
+

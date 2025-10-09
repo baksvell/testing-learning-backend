@@ -1,6 +1,7 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import json
@@ -64,7 +65,9 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Testing Learning Platform API",
     description="API для платформы обучения тестированию",
-    version="1.2.1"
+    version="2.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
 
 # CORS настройки
@@ -75,6 +78,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Middleware для правильной обработки UTF-8
+@app.middleware("http")
+async def add_utf8_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    return response
 
 # Pydantic модели
 class TaskResponse(BaseModel):
@@ -349,7 +359,7 @@ async def test_database():
             "status": "Database connected successfully",
             "database_type": "PostgreSQL" if DATABASE_URL.startswith("postgresql://") else "SQLite",
             "test_result": result[0] if result else None,
-            "message": "Database working with Python 3.11 on Render"
+            "message": "Database working with UTF-8 encoding support"
         }
     except Exception as e:
         return {
