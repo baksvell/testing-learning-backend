@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 import json
 import os
@@ -119,6 +119,14 @@ class UserRegister(BaseModel):
     username: str
     password: str
     email: str
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password too long (max 72 bytes)')
+        if len(v) < 6:
+            raise ValueError('Password too short (min 6 characters)')
+        return v
 
 class Token(BaseModel):
     access_token: str
@@ -149,9 +157,15 @@ MOCK_USERS = {
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, stored_password: str) -> bool:
+    # bcrypt ограничивает длину пароля 72 байтами
+    if len(plain_password.encode('utf-8')) > 72:
+        plain_password = plain_password[:72]
     return pwd_context.verify(plain_password, stored_password)
 
 def get_password_hash(password: str) -> str:
+    # bcrypt ограничивает длину пароля 72 байтами
+    if len(password.encode('utf-8')) > 72:
+        password = password[:72]
     return pwd_context.hash(password)
 
 # JWT функции
