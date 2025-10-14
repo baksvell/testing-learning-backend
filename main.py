@@ -303,16 +303,17 @@ async def submit_task(
 async def register(user_data: UserRegister, db = Depends(get_db)):
     """Регистрация нового пользователя"""
     print(f"Registration attempt: username={user_data.username}, email={user_data.email}, password_length={len(user_data.password)}")
+    
+    # Проверяем, существует ли пользователь
+    existing_user = db.query(User).filter(User.username == user_data.username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    existing_email = db.query(User).filter(User.email == user_data.email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
     try:
-        # Проверяем, существует ли пользователь
-        existing_user = db.query(User).filter(User.username == user_data.username).first()
-        if existing_user:
-            raise HTTPException(status_code=400, detail="Username already exists")
-        
-        existing_email = db.query(User).filter(User.email == user_data.email).first()
-        if existing_email:
-            raise HTTPException(status_code=400, detail="Email already exists")
-        
         # Создаем нового пользователя
         new_user = User(
             username=user_data.username,
