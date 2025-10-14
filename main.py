@@ -299,11 +299,25 @@ async def register(user_data: UserRegister, db = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     
+    # Создаем токен для автоматического входа после регистрации
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user_data.username}, expires_delta=access_token_expires
+    )
+    
     return {
         "message": "User registered successfully",
-        "username": user_data.username,
-        "email": user_data.email,
-        "user_id": new_user.id
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": new_user.id,
+            "username": new_user.username,
+            "email": new_user.email,
+            "level": 1,
+            "experience": 0,
+            "total_score": 0,
+            "created_at": new_user.created_at.isoformat()
+        }
     }
 
 @app.post("/api/auth/login", response_model=Token)
@@ -322,7 +336,80 @@ async def login(user_credentials: UserLogin, db = Depends(get_db)):
     access_token = create_access_token(
         data={"sub": user_credentials.username}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "user": {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "level": 1,
+        "experience": 0,
+        "total_score": 0,
+        "created_at": user.created_at.isoformat()
+    }}
+
+@app.get("/api/auth/me")
+async def get_current_user(current_user: str = Depends(verify_token), db = Depends(get_db)):
+    """Получить данные текущего пользователя"""
+    user = db.query(User).filter(User.username == current_user).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "level": 1,  # Можно добавить в модель User позже
+        "experience": 0,  # Можно добавить в модель User позже
+        "total_score": 0,  # Можно добавить в модель User позже
+        "created_at": user.created_at.isoformat()
+    }
+
+@app.put("/api/user/profile")
+async def update_user_profile(
+    profile_data: dict, 
+    current_user: str = Depends(verify_token), 
+    db = Depends(get_db)
+):
+    """Обновить профиль пользователя"""
+    user = db.query(User).filter(User.username == current_user).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Обновляем только разрешенные поля
+    if "username" in profile_data:
+        # Проверяем, что новый username не занят
+        existing_user = db.query(User).filter(
+            User.username == profile_data["username"],
+            User.id != user.id
+        ).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        user.username = profile_data["username"]
+    
+    if "email" in profile_data:
+        # Проверяем, что новый email не занят
+        existing_email = db.query(User).filter(
+            User.email == profile_data["email"],
+            User.id != user.id
+        ).first()
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email already exists")
+        user.email = profile_data["email"]
+    
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "level": 1,
+            "experience": 0,
+            "total_score": 0,
+            "created_at": user.created_at.isoformat()
+        }
+    }
 
 @app.get("/api/user/activity")
 async def get_user_activity(current_user: str = Depends(verify_token)):
