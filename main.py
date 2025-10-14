@@ -525,6 +525,42 @@ async def init_database():
             "message": "Failed to create database tables"
         }
 
+@app.post("/api/database/migrate")
+async def migrate_database():
+    """Миграция базы данных - добавление колонки role"""
+    try:
+        from sqlalchemy import text
+        
+        db = SessionLocal()
+        
+        # Проверяем, существует ли колонка role
+        result = db.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='users' AND column_name='role'
+        """)).fetchone()
+        
+        if not result:
+            # Добавляем колонку role
+            db.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'user'"))
+            db.commit()
+            message = "Column 'role' added to users table"
+        else:
+            message = "Column 'role' already exists"
+        
+        db.close()
+        
+        return {
+            "status": "Migration completed",
+            "message": message
+        }
+    except Exception as e:
+        return {
+            "status": "Migration failed",
+            "error": str(e),
+            "message": "Failed to migrate database"
+        }
+
 @app.get("/api/admin/users")
 async def get_all_users(
     current_user: str = Depends(verify_admin), 
