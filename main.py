@@ -284,25 +284,30 @@ async def submit_task(
 @app.post("/api/auth/register")
 async def register(user_data: UserRegister, db = Depends(get_db)):
     """Регистрация нового пользователя"""
-    # Проверяем, существует ли пользователь
-    existing_user = db.query(User).filter(User.username == user_data.username).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    
-    existing_email = db.query(User).filter(User.email == user_data.email).first()
-    if existing_email:
-        raise HTTPException(status_code=400, detail="Email already exists")
-    
-    # Создаем нового пользователя
-    new_user = User(
-        username=user_data.username,
-        email=user_data.email,
-        hashed_password=get_password_hash(user_data.password)
-    )
-    
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    try:
+        # Проверяем, существует ли пользователь
+        existing_user = db.query(User).filter(User.username == user_data.username).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        
+        existing_email = db.query(User).filter(User.email == user_data.email).first()
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email already exists")
+        
+        # Создаем нового пользователя
+        new_user = User(
+            username=user_data.username,
+            email=user_data.email,
+            hashed_password=get_password_hash(user_data.password)
+        )
+        
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+    except Exception as e:
+        db.rollback()
+        print(f"Registration error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
     
     # Создаем токен для автоматического входа после регистрации
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
