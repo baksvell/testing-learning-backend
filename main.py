@@ -158,14 +158,18 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, stored_password: str) -> bool:
     # bcrypt ограничивает длину пароля 72 байтами
-    if len(plain_password.encode('utf-8')) > 72:
-        plain_password = plain_password[:72]
+    password_bytes = plain_password.encode('utf-8')
+    if len(password_bytes) > 72:
+        # Обрезаем по байтам, а не по символам
+        plain_password = password_bytes[:72].decode('utf-8', errors='ignore')
     return pwd_context.verify(plain_password, stored_password)
 
 def get_password_hash(password: str) -> str:
     # bcrypt ограничивает длину пароля 72 байтами
-    if len(password.encode('utf-8')) > 72:
-        password = password[:72]
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        # Обрезаем по байтам, а не по символам
+        password = password_bytes[:72].decode('utf-8', errors='ignore')
     return pwd_context.hash(password)
 
 # JWT функции
