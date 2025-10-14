@@ -167,10 +167,18 @@ def verify_password(plain_password: str, stored_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     # bcrypt ограничивает длину пароля 72 байтами
     password_bytes = password.encode('utf-8')
+    print(f"Password hash attempt: original_length={len(password)}, bytes={len(password_bytes)}")
     if len(password_bytes) > 72:
         # Обрезаем по байтам, а не по символам
         password = password_bytes[:72].decode('utf-8', errors='ignore')
-    return pwd_context.hash(password)
+        print(f"Password truncated to: {len(password)} chars, {len(password.encode('utf-8'))} bytes")
+    try:
+        result = pwd_context.hash(password)
+        print(f"Password hash successful")
+        return result
+    except Exception as e:
+        print(f"Password hash failed: {str(e)}")
+        raise
 
 # JWT функции
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
