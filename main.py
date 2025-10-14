@@ -11,14 +11,20 @@ from jose import JWTError, jwt
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from passlib.context import CryptContext
 
 # Настройка базы данных
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
 # Создаем движок базы данных
 if DATABASE_URL.startswith("postgresql://"):
-    # Для PostgreSQL
-    engine = create_engine(DATABASE_URL)
+    # Для PostgreSQL (внешняя БД)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+    )
 else:
     # Для SQLite (fallback)
     engine = create_engine("sqlite:///./test.db", connect_args={"check_same_thread": False})
@@ -139,15 +145,14 @@ MOCK_USERS = {
     "admin": "admin123"         # Простой пароль для тестирования
 }
 
-# Функции для работы с паролями (упрощенные для тестирования)
-def verify_password(plain_password, stored_password):
-    # Для тестирования просто сравниваем строки
-    return plain_password == stored_password
+# Настройки хеширования паролей
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def get_password_hash(password):
-    # Для тестирования просто возвращаем пароль как есть
-    # В продакшене здесь было бы настоящее хеширование
-    return password
+def verify_password(plain_password: str, stored_password: str) -> bool:
+    return pwd_context.verify(plain_password, stored_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
 
 # JWT функции
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -292,7 +297,7 @@ async def register(user_data: UserRegister, db = Depends(get_db)):
     new_user = User(
         username=user_data.username,
         email=user_data.email,
-        hashed_password=user_data.password  # В реальном приложении нужно хешировать
+        hashed_password=get_password_hash(user_data.password)
     )
     
     db.add(new_user)
@@ -328,8 +333,8 @@ async def login(user_credentials: UserLogin, db = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid username")
     
-    # Проверяем пароль (упрощенно для тестирования)
-    if user_credentials.password != user.hashed_password:
+    # Проверяем пароль (bcrypt)
+    if not verify_password(user_credentials.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid password")
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
