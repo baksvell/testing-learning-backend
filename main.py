@@ -465,6 +465,24 @@ async def test_database():
             "message": "Check database configuration"
         }
 
+@app.post("/api/database/init")
+async def init_database():
+    """Принудительное создание таблиц в базе данных"""
+    try:
+        # Создаем все таблицы
+        Base.metadata.create_all(bind=engine)
+        
+        return {
+            "status": "Tables created successfully",
+            "message": "All database tables have been created"
+        }
+    except Exception as e:
+        return {
+            "status": "Table creation failed",
+            "error": str(e),
+            "message": "Failed to create database tables"
+        }
+
 # Для Render
 if __name__ == "__main__":
     import uvicorn
