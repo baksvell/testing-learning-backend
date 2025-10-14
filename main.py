@@ -302,6 +302,7 @@ async def submit_task(
 @app.post("/api/auth/register")
 async def register(user_data: UserRegister, db = Depends(get_db)):
     """Регистрация нового пользователя"""
+    print(f"Registration attempt: username={user_data.username}, email={user_data.email}, password_length={len(user_data.password)}")
     try:
         # Проверяем, существует ли пользователь
         existing_user = db.query(User).filter(User.username == user_data.username).first()
@@ -324,7 +325,10 @@ async def register(user_data: UserRegister, db = Depends(get_db)):
         db.refresh(new_user)
     except Exception as e:
         db.rollback()
+        import traceback
+        error_traceback = traceback.format_exc()
         print(f"Registration error: {str(e)}")
+        print(f"Full traceback: {error_traceback}")
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
     
     # Создаем токен для автоматического входа после регистрации
