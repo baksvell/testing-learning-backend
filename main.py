@@ -506,6 +506,38 @@ async def init_database():
             "message": "Failed to create database tables"
         }
 
+@app.delete("/api/admin/delete-user/{username}")
+async def delete_user(username: str, db = Depends(get_db)):
+    """Удалить пользователя по username (административная функция)"""
+    try:
+        # Ищем пользователя
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Удаляем пользователя
+        db.delete(user)
+        db.commit()
+        
+        return {
+            "status": "User deleted successfully",
+            "message": f"User '{username}' has been deleted",
+            "deleted_user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        return {
+            "status": "User deletion failed",
+            "error": str(e),
+            "message": "Failed to delete user"
+        }
+
 # Для Render
 if __name__ == "__main__":
     import uvicorn
