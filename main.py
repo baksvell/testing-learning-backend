@@ -40,6 +40,7 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
+    role = Column(String, default="user")  # "admin" или "user"
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Task(Base):
@@ -201,6 +202,13 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+def verify_admin(current_user: str = Depends(verify_token), db = Depends(get_db)):
+    """Проверка админских прав пользователя"""
+    user = db.query(User).filter(User.username == current_user).first()
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
 # Простые тестовые данные
 MOCK_TASKS = [
     {
@@ -354,6 +362,7 @@ async def register(user_data: UserRegister, db = Depends(get_db)):
             "id": new_user.id,
             "username": new_user.username,
             "email": new_user.email,
+            "role": new_user.role,
             "level": 1,
             "experience": 0,
             "total_score": 0,
@@ -381,6 +390,7 @@ async def login(user_credentials: UserLogin, db = Depends(get_db)):
         "id": user.id,
         "username": user.username,
         "email": user.email,
+        "role": user.role,
         "level": 1,
         "experience": 0,
         "total_score": 0,
@@ -398,6 +408,7 @@ async def get_current_user(current_user: str = Depends(verify_token), db = Depen
         "id": user.id,
         "username": user.username,
         "email": user.email,
+        "role": user.role,
         "level": 1,  # Можно добавить в модель User позже
         "experience": 0,  # Можно добавить в модель User позже
         "total_score": 0,  # Можно добавить в модель User позже
@@ -513,6 +524,86 @@ async def init_database():
             "error": str(e),
             "message": "Failed to create database tables"
         }
+
+@app.get("/api/admin/users")
+async def get_all_users(
+    current_user: str = Depends(verify_admin), 
+    db = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100
+):
+    """Получить список всех пользователей (только для админов)"""
+    users = db.query(User).offset(skip).limit(limit).all()
+    return {
+        "users": [
+            {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": user.role,
+                "created_at": user.created_at.isoformat()
+            }
+            for user in users
+        ],
+        "total": db.query(User).count()
+    }
+
+@app.put("/api/admin/users/{user_id}/role")
+async def update_user_role(
+    user_id: int,
+    role_data: dict,
+    current_user: str = Depends(verify_admin),
+    db = Depends(get_db)
+):
+    """Изменить роль пользователя (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_role = role_data.get("role")
+    if new_role not in ["admin", "user"]:
+        raise HTTPException(status_code=400, detail="Invalid role. Must be 'admin' or 'user'")
+    
+    user.role = new_role
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": f"User role updated to {new_role}",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role
+        }
+    }
+
+@app.delete("/api/admin/users/{user_id}")
+async def delete_user_by_id(
+    user_id: int,
+    current_user: str = Depends(verify_admin),
+    db = Depends(get_db)
+):
+    """Удалить пользователя по ID (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Нельзя удалить самого себя
+    if user.username == current_user:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    db.delete(user)
+    db.commit()
+    
+    return {
+        "message": f"User '{user.username}' has been deleted",
+        "deleted_user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email
+        }
+    }
 
 @app.delete("/api/admin/delete-user/{username}")
 async def delete_user(username: str, db = Depends(get_db)):
